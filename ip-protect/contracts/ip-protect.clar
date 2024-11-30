@@ -177,10 +177,12 @@
             (current-timestamp block-height)
         )
         ;; Check if license is active and usage is permitted
-        (and 
-            (<= (get start-date license-details) current-timestamp)
-            (>= (get end-date license-details) current-timestamp)
-            (is-some (index-of (get usage-rights license-details) intended-use))
+        (ok 
+            (and 
+                (<= (get start-date license-details) current-timestamp)
+                (>= (get end-date license-details) current-timestamp)
+                (is-some (index-of (get usage-rights license-details) intended-use))
+            )
         )
     )
 )
