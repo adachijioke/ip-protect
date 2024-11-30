@@ -10,6 +10,7 @@
 (define-constant ERR-INVALID-TRANSFER (err u102))
 (define-constant ERR-LICENSING-ERROR (err u103))
 (define-constant ERR-INVALID-IP-TYPE (err u105))
+(define-constant ERR-INVALID-ADDRESS (err u106))
 
 ;; Define allowed IP types as a constant
 (define-constant ALLOWED-IP-TYPES 
@@ -23,6 +24,27 @@
         "geographical-indication"
     )
 )
+
+;; Define allowed license types
+(define-constant ALLOWED-LICENSE-TYPES 
+    (list 
+        "exclusive" 
+        "non-exclusive" 
+        "perpetual"
+        "limited-term"
+        "commercial"
+        "non-commercial"
+    )
+)
+
+;; Define maximum usage rights
+(define-constant MAX-USAGE-RIGHTS u5)
+
+;; Define maximum license type length
+(define-constant MAX-LICENSE-TYPE-LENGTH u23)
+
+;; Define maximum duration limit
+(define-constant MAX-LICENSE-DURATION u52560) ;; Approximately 2 years in block height
 
 ;; Data maps and storage
 ;; Store IP metadata
@@ -102,7 +124,7 @@
 (define-public (issue-license
     (ip-id uint)
     (licensee principal)
-    (license-type (string-ascii 50))
+    (license-type (string-ascii 14))
     (duration uint)
     (usage-rights (list 5 (string-ascii 100)))
     (royalty-rate uint)
@@ -115,9 +137,29 @@
                 (map-get? intellectual-properties { ip-id: ip-id }) 
                 ERR-IP-NOT-FOUND
             ))
+            (max-registered-ip-id (var-get next-ip-id))
         )
+
+         ;; Validate ip-id is within the range of registered IPs
+        (asserts! (and (> ip-id u0) (<= ip-id max-registered-ip-id)) ERR-IP-NOT-FOUND)
+
         ;; Validate license issuance
         (asserts! (is-eq tx-sender (get current-owner ip-details)) ERR-NOT-AUTHORIZED)
+
+        ;; Validate license type
+        (asserts! (is-some (index-of ALLOWED-LICENSE-TYPES license-type)) ERR-INVALID-IP-TYPE)
+        
+        ;; Validate licensee is not the current owner
+        (asserts! (not (is-eq licensee (get current-owner ip-details))) ERR-INVALID-TRANSFER)
+        
+        ;; Validate duration is within reasonable limits
+        (asserts! (and (> duration u0) (<= duration MAX-LICENSE-DURATION)) ERR-LICENSING-ERROR)
+        
+        ;; Validate usage rights length
+        (asserts! (<= (len usage-rights) MAX-USAGE-RIGHTS) ERR-LICENSING-ERROR)
+        
+        ;; Validate royalty rate (e.g., between 0 and 10000 representing 0% to 100%)
+        (asserts! (and (>= royalty-rate u0) (<= royalty-rate u10000)) ERR-LICENSING-ERROR)
         
         ;; Increment license ID
         (var-set next-license-id license-id)
@@ -146,6 +188,7 @@
 )
     (let 
         (
+            (max-registered-ip-id (var-get next-ip-id))
             (ip-details (unwrap! 
                 (map-get? intellectual-properties { ip-id: ip-id }) 
                 ERR-IP-NOT-FOUND
@@ -157,8 +200,11 @@
                 )
             )
         )
+        ;; validate ip-id is within the range of registered IPs
+        (asserts! (and (> ip-id u0) (<= ip-id max-registered-ip-id)) ERR-IP-NOT-FOUND)
         ;; Validate transfer
         (asserts! (is-eq tx-sender (get current-owner ip-details)) ERR-NOT-AUTHORIZED)
+        (asserts! (is-standard new-owner) ERR-INVALID-ADDRESS)
 
         ;; Update IP ownership
         (map-set intellectual-properties 
@@ -211,11 +257,14 @@
 )
     (let 
         (
+            (max-registered-ip-id (var-get next-ip-id))
             (ip-details (unwrap! 
                 (map-get? intellectual-properties { ip-id: ip-id }) 
                 ERR-IP-NOT-FOUND
             ))
         )
+        ;; Validate ip-id is within the range of registered IPs
+        (asserts! (and (> ip-id u0) (<= ip-id max-registered-ip-id)) ERR-IP-NOT-FOUND)
         ;; Validate revenue collection
         (asserts! (is-eq tx-sender (get current-owner ip-details)) ERR-NOT-AUTHORIZED)
 
