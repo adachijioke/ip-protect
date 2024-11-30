@@ -9,6 +9,20 @@
 (define-constant ERR-IP-NOT-FOUND (err u101))
 (define-constant ERR-INVALID-TRANSFER (err u102))
 (define-constant ERR-LICENSING-ERROR (err u103))
+(define-constant ERR-INVALID-IP-TYPE (err u105))
+
+;; Define allowed IP types as a constant
+(define-constant ALLOWED-IP-TYPES 
+    (list 
+        "patent" 
+        "copyright" 
+        "trademark" 
+        "trade-secret"
+        "industrial-design"
+        "plant-variety"
+        "geographical-indication"
+    )
+)
 
 ;; Data maps and storage
 ;; Store IP metadata
@@ -48,14 +62,17 @@
 
 ;; Register a new Intellectual Property
 (define-public (register-ip
-    (ip-type (string-ascii 50))
+    (ip-type (string-ascii 23))
     (additional-metadata (optional (string-utf8 500)))
 )
+    
     (let 
         (
             (ip-id (+ (var-get next-ip-id) u1))
             (current-timestamp block-height)
         )
+         ;; Validate IP type is in the allowed list
+        (asserts! (is-some (index-of ALLOWED-IP-TYPES ip-type)) ERR-INVALID-IP-TYPE)
         ;; Increment IP ID
         (var-set next-ip-id ip-id)
 
